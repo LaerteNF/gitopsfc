@@ -1,0 +1,51 @@
+name: CDGitops
+
+on: 
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build
+    # git actions monta uma máquina ubuntu para gerar essa imagem
+    runs-on: ubuntu-latest
+
+    steps:
+    # pega o nosso codigo do repositório e baixa na máquina ubuntu alocada
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    # faz o build da imagem e envia para um repositório docker hub de um usuário com o nome e senha do repositório docker hub
+    # essas variáveis secrets estarão configuradas no github
+    # para que seja feito o build, no repositório git deve haver um Dockerfile e os arquivos que o mesmo utiliza
+    - name: Build and push image to Dockerhub
+      uses: docker/build-push-action@v1.1.0
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: ${{ secrets.DOCKER_USERNAME }}/gitopsfc
+        tags: ${{ github.sha }}, latest
+
+#    - name: Setup Kustomize
+#      uses: imranismail/setup-kustomize@v1
+#      with: 
+#        kustomize-version: "3.6.1"
+#
+#    - name: Update Kubernetes resources
+#      env:
+#        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+#      run: |
+#        cd k8s
+#        kustomize edit set image goserver=$DOCKER_USERNAME/gitopsfc:$GITHUB_SHA
+#
+#    - name: Commit
+#      run: |
+#        git config --local user.email "action@github.com"
+#        git config --local user.name "GitHub Action"
+#        git commit -am "Bump docker version"
+#
+#    - name: Push
+#      uses: ad-m/github-push-action@master
+#      with:
+#        github_token: ${{ secrets.GITHUB_TOKEN }}
+#        repository: devfullcycle/gitopsfc

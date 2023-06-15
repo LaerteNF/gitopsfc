@@ -1,0 +1,45 @@
+
+
+A idéia de um fluxo tradicional de ci/cd no git é que ao comitarmos nosso código fonte no repositório é disparado um processo que valida nosso código, gera testes automatizados, eventualmente gera alguma documentação (CI) e que caso passe nessa etapa que gera uma imagem/build de nossa aplicação (CD) que será deployada no ambinete de produção (no cluster kubernetes por exemplo). Porém apesar desstas etapas não há uma garantia que o que está no git é de fato o que está em produção, pode ocorrer alguma interveção manual ou falha em algum dos passos do processo.
+
+O conceito de GitOps é garantir que o que está no meu repositório git é o oque está no meu ambiente de produção. Para isso existe uma camada agente que uma vez que foi declarado através de um commit que a versão x do repositório é a ultima, então esse agente sempre fica monitorando o que está no ambinete de produção e no git e garante que a versão seja sempre a mesma no dois.
+
+No curso será feito uma webserver hello world que quando o repositório do memso for alterado, deverá ser publicaod no cluster kubernetes. O agent utlizado será o argocd.
+
+Se tiver o runtime do Go na maquina dar um go init nome do modulo e no diretório feito isso será criado o arquivo go.mod que é como se fosse um package.json do node. Eu apenas copiei esse arquivo do repositório da aula (não quis instalar o go). Também foi criado main.go que é o Hello world que respode na porta 8080. Foi criado um Dockerfile para gerar a imagem com nosso Hello world.
+
+Após a criação do Dockerfile rodar o comando do build do mesmo:
+
+docker build -t lalausan/gitopsfc:latest .
+
+Depois subir a imagem pra ver se a mesma está funcionando:
+
+Usar o comando "docker login"
+
+Entrar com o user e senha da conta do dockerhub
+
+docker push lalausan/gitopsfc:latest
+
+
+Criar fluxo de geração de imagem
+---------------------------------
+
+Para criação do workflow, foi criada a pasta .github e dentro dela a pasta workflows e o arquivo cd.yaml dentro da mesma. esta pasta será comitada em algum repositório para configurar o workflow especificado pelo .yaml.
+
+Deposi foi criado um novo repositório público em minha conta github com o nome gitopsfc. depois de criado em em settings com o repositório selecionado e em secretes and variables -> actions. E criar as secrets necessárias que estão sendo usadas no arquivo cd.yaml (ver arquivo), foram criadas as secrets do nome do usuario docker hub (lalausan), senha do repositório docker hub. Na senha tem que ser passado um token de acesso que é gerado lá na conta do docker hub, entrar lá em conta, segurança, pegar um existente ou criar um token.
+
+Após isso na pasta local onde possui o fontes go, pasta .github e dockerfile dar os comanos para subir os arquivo locais para o repositório git criado:
+
+git init
+
+git add .
+
+git commit -m 'first commit'
+
+git branch -M main
+
+git remote add origin https://github.com/LaerteNF/gitopsfc.git
+
+git push -u origin main
+
+Após comitar no main o git actions já comecará a rodar. Após a conclusão, podemos ver uma nova imagem gerada no docker hub, essa imagem foi gerada com nome com codigo sha aleatório, não é fixo pois sendo um processo que pode rodar várias vezes o nome repetido daria erro ao subior uma imagem com nome já existente no docker hub
