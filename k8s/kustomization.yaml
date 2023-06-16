@@ -9,4 +9,4 @@ resources:
 images:
 - name: goserver
   newName: lalausan/gitopsfc
-  newTag: newTag
+  newTag: 4ff66e78825bbaac56e8858fd14672ed154ff733
