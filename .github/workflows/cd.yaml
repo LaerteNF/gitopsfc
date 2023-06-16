@@ -9,8 +9,6 @@ jobs:
     name: Build
     # git actions monta uma máquina ubuntu para gerar essa imagem
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
 
     steps:
     # pega o nosso codigo do repositório e baixa na máquina ubuntu alocada
