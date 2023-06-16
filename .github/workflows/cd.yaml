@@ -26,26 +26,31 @@ jobs:
         repository: ${{ secrets.DOCKER_USERNAME }}/gitopsfc
         tags: ${{ github.sha }}, latest
 
-#    - name: Setup Kustomize
-#      uses: imranismail/setup-kustomize@v1
-#      with: 
-#        kustomize-version: "3.6.1"
-#
-#    - name: Update Kubernetes resources
-#      env:
-#        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-#      run: |
-#        cd k8s
-#        kustomize edit set image goserver=$DOCKER_USERNAME/gitopsfc:$GITHUB_SHA
-#
-#    - name: Commit
-#      run: |
-#        git config --local user.email "action@github.com"
-#        git config --local user.name "GitHub Action"
-#        git commit -am "Bump docker version"
-#
-#    - name: Push
-#      uses: ad-m/github-push-action@master
-#      with:
-#        github_token: ${{ secrets.GITHUB_TOKEN }}
-#        repository: devfullcycle/gitopsfc
+     # instala o Kustomize na maquina que faz o build da imagem
+    - name: Setup Kustomize
+      uses: imranismail/setup-kustomize@v1
+      with: 
+        kustomize-version: "3.6.1"
+
+    - name: Update Kubernetes resources
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+       # pipe é para trabalhar com o comando pulando linhas
+       # altera o valor dos atributos da image de nome goserver especificada no kustomization.yaml do repositório
+      run: |
+        cd k8s
+        kustomize edit set image goserver=$DOCKER_USERNAME/gitopsfc:$GITHUB_SHA
+
+    # commita no próprio repositório git a alteração feita acima no arquivo kustomization.yaml
+    - name: Commit
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -am "Bump docker version"
+
+    # dá o push no proprio reposttório do commit acima
+    - name: Push
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        repository: LaerteNF/gitopsfc

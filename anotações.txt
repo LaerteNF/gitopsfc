@@ -34,7 +34,7 @@ git init
 
 git add .
 
-git commit -m 'first commit'
+git commit -m "first commit"
 
 git branch -M main
 
@@ -42,4 +42,65 @@ git remote add origin https://github.com/LaerteNF/gitopsfc.git
 
 git push -u origin main
 
-Após comitar no main o git actions já comecará a rodar. Após a conclusão, podemos ver uma nova imagem gerada no docker hub, essa imagem foi gerada com nome com codigo sha aleatório, não é fixo pois sendo um processo que pode rodar várias vezes o nome repetido daria erro ao subior uma imagem com nome já existente no docker hub
+Após comitar no main o git actions já comecará a rodar, executando as ações especificadas no cd.yaml. Após a conclusão, podemos ver uma nova imagem gerada no docker hub, essa imagem foi gerada com a tag com codigo sha aleatório.
+
+
+Criando manifestos Kubernetes
+-------------------------------
+
+Nas aulas foram usados um cluster kubernetes kind, criar o novo cluster:
+
+kind create cluster --name=gitopsfc
+
+Depois de criado, mudar o contexto para o mesmo:
+
+kubectl cluster-info --context kind-gitopsfc
+
+Depois na nossa pasta de trabalho (Gfullcycle/GitOps) onde estão todos nosso arquivo foi criada também a pasta k8s e dentro dela os arquivo deployment.yaml e
+service.yaml. O deployment.yaml cria um container de nome 'goserver' com a imagem 'goserver' e labels 'goserver'. Essa imagem não existe, será explicado nos proximos passos.
+
+Kustomize
+-----------------------
+
+Kustomize é uma ferramenta de linha de comando desenvolvida pela equipe do Kubernetes que permite a personalização e o gerenciamento de configurações do Kubernetes. Ele permite que você defina e modifique recursos Kubernetes usando patches e overlays, sem a necessidade de editar diretamente os arquivos YAML originais.
+
+Com o Kustomize, você pode ter um conjunto básico de arquivos YAML e aplicar modificações específicas em diferentes ambientes, como desenvolvimento, teste e produção, sem precisar duplicar ou modificar manualmente os arquivos YAML originais. Ele ajuda a manter a consistência e a reutilização de configurações em diferentes ambientes.
+
+O Kustomize será rodado apenas lá na máquina de build do gitactions.
+
+Foi criado o arquivo kustomize.yaml que referencia os arquivos deployment.yaml e service.yaml, nesse arquivo referenciamos a imagem 'goserver' que é o nome colocado no deployment.yaml (apenas nome ficticio) e com essa referencia feita a esse arquivo configuramos que o novo nome dessa imagem é 'lalausan/gitopsfc' (imagem que existe) e passamos também o novo valor de tag que será pego do sha (codigo aleatorio unico) no gitactions, ou seja, o kustomize.yaml modificará os valores do deployment (nos proximos passos a frente na parte do argocd).
+
+Quando o código for comitado no git, o campo tag do Kustomization.yaml será atualizado com uma nova tag sha e dessa forma o agent (argo) verificará que essa tag está
+diferente da imagem no cluster, disparando assim então a atulização do kluster com a nova imagem (será explicado melhor nos proximos passos).
+
+No arquivo cd.yaml (ver arquivo) que é lido pelo gitaction foi adicionada as instruções do kustomize onde a ele instala o kustomize na maquina do gitaction onde será feito o build 
+e roda o comando kustomize para atribuir ao objeto image definido no kustomization.yaml os valores de nome da imagem ('lalausan/gitopsfc' já estava assim por default) e também o tag sha. Ou seja nesse trecho quando rodar lá no action do git, fará com que o valor tag será do arquivo kustomization.yaml seja alterado, que por sua vez
+seta esses valores no deploymnet.yaml. Como houve alteração no Kustomize, o agente irá publicar a nova imagem. Após as alterações no cd.yaml comitar as mesmas:
+
+git add . 
+git commit -m "cd"
+git push origin main
+
+APós esse passos, oque efetivamente terá sido feito é:
+
+A imagem nova foi gerada e enviada para o Dokcer hub (já estava fazendo isso desde o passo Criar fluxo de geração de imagem)
+
+E foi alterado o kustomization.yaml no repositrório com o valor da newTag sendo o sha (codigo aleatorio) gerado pelo gitAction
+
+Apenas isso, todo esse passo foi feito apenas para gerar essa nova tag com um valor novo para que nos proximos passos o Argo consiga captar que houve
+uma alteração no repositório e faça a publicação da nova imagem.
+
+Entrar na pasta k8s e dar um apply  na mesma
+
+Kubectl apply -f .
+
+Esse passo é necessário para subir o deployment goserver (com imagem vazia ainda) e o service porque precisa ter algo no ar para o Argo comparar nos próximos passos.
+
+
+Instalando ArgoCD
+------------------------------------
+
+
+
+
+
