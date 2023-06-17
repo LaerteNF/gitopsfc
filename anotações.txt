@@ -70,35 +70,102 @@ O Kustomize será rodado apenas lá na máquina de build do gitactions.
 
 Foi criado o arquivo kustomize.yaml que referencia os arquivos deployment.yaml e service.yaml, nesse arquivo referenciamos a imagem 'goserver' que é o nome colocado no deployment.yaml (apenas nome ficticio) e com essa referencia feita a esse arquivo configuramos que o novo nome dessa imagem é 'lalausan/gitopsfc' (imagem que existe) e passamos também o novo valor de tag que será pego do sha (codigo aleatorio unico) no gitactions, ou seja, o kustomize.yaml modificará os valores do deployment (nos proximos passos a frente na parte do argocd).
 
-Quando o código for comitado no git, o campo tag do Kustomization.yaml será atualizado com uma nova tag sha e dessa forma o agent (argo) verificará que essa tag está
+Quando o código for comitado no git, o campo  new tag do Kustomization.yaml será atualizado com uma nova tag sha e dessa forma o agent (argo) verificará que essa tag está
 diferente da imagem no cluster, disparando assim então a atulização do kluster com a nova imagem (será explicado melhor nos proximos passos).
 
 No arquivo cd.yaml (ver arquivo) que é lido pelo gitaction foi adicionada as instruções do kustomize onde a ele instala o kustomize na maquina do gitaction onde será feito o build 
-e roda o comando kustomize para atribuir ao objeto image definido no kustomization.yaml os valores de nome da imagem ('lalausan/gitopsfc' já estava assim por default) e também o tag sha. Ou seja nesse trecho quando rodar lá no action do git, fará com que o valor tag será do arquivo kustomization.yaml seja alterado, que por sua vez
-seta esses valores no deploymnet.yaml. Como houve alteração no Kustomize, o agente irá publicar a nova imagem. Após as alterações no cd.yaml comitar as mesmas:
+e roda o comando kustomize para atribuir ao objeto image definido no kustomization.yaml os valores de nome da imagem ('lalausan/gitopsfc' já estava assim por default) e também o new tag sha. Ou seja nesse trecho quando rodar lá no action do git, fará com que o valor new tag do arquivo kustomization.yaml seja alterado. Como houve alteração no Kustomize, o agente irá publicar a nova imagem. Após as alterações no cd.yaml comitar as mesmas:
 
 git add . 
 git commit -m "cd"
 git push origin main
 
+Verificar na git actions se os passos especificados no cd.yaml rodaram ok no build. Tive um problema e tive que ir nas config do repositório e colocar a config:
+
+Settings -> Actions -> General -> Workflow permissions:
+
+Checar a opção "Read and write permissions" e dar save.
+
 APós esse passos, oque efetivamente terá sido feito é:
 
-A imagem nova foi gerada e enviada para o Dokcer hub (já estava fazendo isso desde o passo Criar fluxo de geração de imagem)
+A imagem nova foi gerada e enviada para o Docker hub (já estava fazendo isso desde o passo Criar fluxo de geração de imagem)
 
-E foi alterado o kustomization.yaml no repositrório com o valor da newTag sendo o sha (codigo aleatorio) gerado pelo gitAction
+E foi alterado o kustomization.yaml no prórprio repositório com o valor da newTag sendo o sha (codigo aleatorio) gerado pelo gitAction (ver no repositorio git que 
+o kustomization.yaml teve a newTag com valor atribuido após o commit e execução da action).
 
-Apenas isso, todo esse passo foi feito apenas para gerar essa nova tag com um valor novo para que nos proximos passos o Argo consiga captar que houve
+Apenas isso, todo esse passo foi feito apenas para gerar essa nova tag com um valor novo no arquivo kustomization.yaml a cada commit para que nos proximos passos o Argo consiga captar que houve
 uma alteração no repositório e faça a publicação da nova imagem.
 
-Entrar na pasta k8s e dar um apply  na mesma
+Entrar na pasta k8s local e dar um apply  na mesma
 
 Kubectl apply -f .
+
+Ver o deploy e service no ar:
+
+kubectl get deploy
+kubectl get services
 
 Esse passo é necessário para subir o deployment goserver (com imagem vazia ainda) e o service porque precisa ter algo no ar para o Argo comparar nos próximos passos.
 
 
 Instalando ArgoCD
 ------------------------------------
+
+Argo será a ferramenta agent que focará lendo nosso repositorio git e fara a publicação no cluster kubernetes caso ocorra alteração.
+
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml (se der algum b.o abrir o terminal como admin)
+
+Verificar se instalação foi ok:
+
+kubectl get all -n argocd
+
+Pegar senha inicial admin gerada para acessar o argo:
+
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+
+a minha gerada foi cM8NptkuHbRaUmnr (virá em base64 pelo comando, usar algum decode na net)
+
+Dar o portforward para acessar op console do argo:
+
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+entrar no console no locahost:8080, entrar com user 'admin' e senha pega pelo comando acima.
+
+
+Fazendo deploy com Argocd
+--------------------------
+
+No console criar um 'new app' o nome dado foi goserver, no Project name deixar defaul (porque está pegando o cluster default que estamos conectado no kubectl).
+No Sync policy a opção manual faz com que o argo apenas avise que houve uma alteração e o desenvolvedor tem que entrar e disparar manualemnte o deploy, 
+no automático ele já faz o deploy sozinho, no primeiro momento foi esoclhido manual.
+
+Na parte source, repository url, colocar o repositório do git:
+
+https://github.com/LaerteNF/gitopsfc.git
+
+No Path escolher k8s (a ferramenta já identificou que este diret´roio lá no repositório possui arquivos manifestos kubernetes por isso sugeriu nesse combo)
+
+Na parte destination, cluster url selecionar a default:
+
+https://kubernetes.default.svc
+
+Namespace: default
+
+Após isso a ferramenta tbm já identifica que está sendo utilizado o Kustomize pois localizou o arquivo kustomization.yaml dentro da pasta k8s.
+
+Não preencher nada na seção kustomize e deixar como veio. Então dar o CREATE. Após isso aparece o cardzinho do app criado. De cara ele já mostra que a aplicação está degradada pois ele verifica no kubernetes que esta aplicação não está ready e que tbm está desincronizada  pois a versão do git não é igual a do cluster. Ao clicarmos
+no card e expandirmos os detalhes vemos que ele identifica que o service está criado ok, porém o deploy não pois temos um replicaset que gera um pod mas o pod goserver não está funcionando (pois a imagem está vazia e o pod não está ready). AO clicar no card do pod ele mostra detalhadamento as infos do mesmo como o motivo dele estar falhando por não conseguir pegar a imagem.
+
+Clicar em SYNC no menu superior e depois em synchronize. Então ele baixa a imagem e recria o pod e na ferramenta já exibe em tempo real o pod criado e saudável.
+
+Para testar o funcionamento entramos na pasta da aplicação (fullcycle\GitOps) e alteramos o main.go  (colocar qualquer coisa na diferente no html de retorno do hello world). e então dar o git commit e push:
+
+git add . 
+git commit -m "Mudando para Heloo Argo!"
+git push origin main
+
+
 
 
 
